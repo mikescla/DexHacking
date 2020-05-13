@@ -7,13 +7,8 @@ package InstructionMgmt;
 
 import com.google.common.collect.Lists;
 import org.jf.dexlib2.Opcode;
-import org.jf.dexlib2.builder.instruction.BuilderInstruction10x;
-import org.jf.dexlib2.builder.instruction.BuilderInstruction21c;
-import org.jf.dexlib2.builder.instruction.BuilderInstruction22c;
-import org.jf.dexlib2.builder.instruction.BuilderInstruction35c;
+import org.jf.dexlib2.builder.instruction.*;
 import org.jf.dexlib2.iface.DexFile;
-import org.jf.dexlib2.iface.instruction.Instruction;
-import org.jf.dexlib2.immutable.instruction.ImmutableInstruction11n;
 import org.jf.dexlib2.immutable.reference.ImmutableFieldReference;
 import org.jf.dexlib2.immutable.reference.ImmutableMethodReference;
 import org.jf.dexlib2.immutable.reference.ImmutableStringReference;
@@ -29,9 +24,8 @@ public class InstructionBuilder {
     public InstructionBuilder(DexFile dexFile) {
     }
 
-    public static Instruction NO_OP() {
-        return new BuilderInstruction10x(
-                Opcode.NOP);
+    public static BuilderInstruction10x NO_OP() {
+        return new BuilderInstruction10x(Opcode.NOP);
     }
 
     public static BuilderInstruction21c SGET_OBJECT(int registerA,
@@ -111,10 +105,7 @@ public class InstructionBuilder {
                                                        String name,
                                                        Iterable parameters,
                                                        String returnType) {
-        return new BuilderInstruction35c(Opcode.INVOKE_VIRTUAL, registerCount
-                , registerC, registerD, registerE, registerF, registerG,
-                new ImmutableMethodReference(definingClass, name, parameters,
-                        returnType));
+        return new BuilderInstruction35c(Opcode.INVOKE_VIRTUAL, registerCount, registerC, registerD, registerE, registerF, registerG, new ImmutableMethodReference(definingClass, name, parameters, returnType));
     }
 
     public static BuilderInstruction21c CONST_4(int registerA, int value) {
@@ -122,9 +113,9 @@ public class InstructionBuilder {
                 new ImmutableStringReference(Integer.toHexString(value)));
     }
 
-    public static Instruction CONST_4_Instr(int registerA, int value) {
-        return new ImmutableInstruction11n(Opcode.CONST_4,
-                registerA, value);
+    public static BuilderInstruction11n CONST_4_Instr(int registerA,
+                                                      int value) {
+        return new BuilderInstruction11n(Opcode.CONST_4, registerA, value);
     }
 
 }

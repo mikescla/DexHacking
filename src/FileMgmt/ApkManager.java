@@ -5,10 +5,8 @@
  */
 package FileMgmt;
 
-import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
-import java.io.InputStreamReader;
 import java.nio.file.Paths;
 import java.util.Scanner;
 
@@ -49,7 +47,7 @@ public class ApkManager {
     public void decodeApk(String apkPath, String outputPath) {
         try{
             Process cmd =
-                    Runtime.getRuntime().exec("java -jar \"" + this.apkToolPath + "\" d -s -f -o \"" + outputPath + "\" \"" + apkPath + "\"");
+                    Runtime.getRuntime().exec("java -jar \"" + this.apkToolPath + "\" d -r -s -f -o \"" + outputPath + "\" \"" + apkPath + "\"");
             Scanner scanner = new Scanner(cmd.getErrorStream());
             while (scanner.hasNext()) {
                 System.out.println(scanner.nextLine());

@@ -5,10 +5,12 @@ import FileMgmt.ApkManager;
 import FileMgmt.DexMgmt;
 import FileMgmt.LoggerMgmt;
 import InstructionMgmt.InstructionBuilder;
-
-
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
+import com.google.common.io.Files;
+import org.apache.commons.cli.*;
+import org.jf.dexlib2.builder.BuilderInstruction;
+import org.jf.dexlib2.builder.instruction.BuilderInstruction21c;
+import org.jf.dexlib2.builder.instruction.BuilderInstruction35c;
 
 import java.io.IOException;
 import java.nio.file.DirectoryStream;
@@ -17,22 +19,12 @@ import java.nio.file.Paths;
 import java.util.*;
 import java.util.logging.Logger;
 
-import com.google.common.io.Files;
-import org.apache.commons.cli.*;
-import org.jf.dexlib2.Opcode;
-import org.jf.dexlib2.builder.MethodImplementationBuilder;
-import org.jf.dexlib2.builder.instruction.BuilderInstruction10x;
-import org.jf.dexlib2.builder.instruction.BuilderInstruction21c;
-import org.jf.dexlib2.builder.instruction.BuilderInstruction35c;
-import org.jf.dexlib2.iface.MethodImplementation;
-import org.jf.dexlib2.iface.instruction.Instruction;
-import org.jf.dexlib2.immutable.ImmutableMethodImplementation;
-
-import static InstructionMgmt.InstructionBuilder.*;
-import static utils.FeatureUtils.*;
+import static InstructionMgmt.InstructionBuilder.INVOKE_DIRECT;
+import static InstructionMgmt.InstructionBuilder.INVOKE_VIRTUAL;
+import static utils.FeatureUtils.getPackageNameFromFeature;
+import static utils.FeatureUtils.isSystemFeature;
 import static utils.IOUtils.getSHA256Hash;
 import static utils.Settings.*;
-import static utils.Settings.PACKAGE_ID;
 
 /**
  * @author fabri
@@ -60,7 +52,7 @@ public class HackingSystem {
         String apiLevel = cmd.getOptionValue("apil",
                 Integer.toString(DEF_API_LEVEL));
 
-        boolean useLoops = false;
+        boolean useLoops = true;
 
         DirectoryStream<Path> inputStream =
                 java.nio.file.Files.newDirectoryStream(Paths.get(inputApkDir));
@@ -98,75 +90,80 @@ public class HackingSystem {
             // - load feature vector
             // - map to feature name
             Map<String, Integer> featuresToAdd = new HashMap<>();
-            featuresToAdd.put("java.io.BufferedInputStream", 1);
+            featuresToAdd.put("android.net.wifi.p2p.WifiP2pDevice", 3);
             for (Map.Entry<String, Integer> entry : featuresToAdd.entrySet()) {
                 String currFeature = entry.getKey();
                 int occurrence = entry.getValue();
 
                 String packageName = getPackageNameFromFeature(currFeature);
-                //                if(isSystemFeature(packageName)) {
-                if (true) {
-                    //                    Map<String, String> instrInfoMap =
-                    //                            getSuitableSystemMethod
-                    //                            (packageName);
-                    //                    String className = instrInfoMap.get
-                    //                    ("class");
-                    //                    String methodName = instrInfoMap
-                    //                    .get("method");
+                if (!isSystemFeature(packageName)) break;
+
+                //                    Map<String, String> instrInfoMap =
+                //                            getSuitableSystemMethod
+                //                            (packageName);
+                //                    String className = instrInfoMap.get
+                //                    ("class");
+                //                    String methodName = instrInfoMap
+                //                    .get("method");
 
 
-                    String className = "Ljava/math/BigDecimal;";
-                    String methodName = "<init>";
-                    List<String> params = new ArrayList<>();
-                    params.add("I");
+                String className = "Landroid/net/wifi/p2p/WifiP2pDevice;";
+                String methodName = "describeContents";
+                List<String> params = new ArrayList<>();
+                //                params.add("I");
 
-                    Instruction instr1 =
-                            InstructionBuilder.NEW_INSTANCE(0, className);
-                    Instruction instr2 = CONST_4_Instr(1,5 );
-                    BuilderInstruction35c instr3 = INVOKE_DIRECT(2, 0, 1,
-                            0,0,0, className, methodName, params,  "V");
-                    List<Instruction> instructions =
+                int baseNLoopRegs = 2;
+                int oldOffset = 3;
+                BuilderInstruction21c instr1 =
+                        InstructionBuilder.NEW_INSTANCE(1, className);
+                //                    BuilderInstruction11n instr2 =
+                //                    CONST_4_Instr(oldOffset+2,
+                //                            5 );
+                BuilderInstruction35c instr2 = INVOKE_DIRECT(1, 1, 0, 0, 0, 0
+                        , className, "<init>", Lists.newArrayList(), "V");
+                BuilderInstruction35c instr3 = INVOKE_VIRTUAL(1, 1, 0, 0, 0,
+                        0, className, methodName, params, "V");
+                List<BuilderInstruction> instructions = new ArrayList<>();
+                //                    Instruction instr4 = NO_OP();
+                //                    instructions = new ArrayList<>(Arrays
+                //                    .asList(instr4));
+                if (useLoops) {
+                    //                        String baseClassName =
+                    //                                "Ljava/lang/System;";
+                    //                        BuilderInstruction21c instr1 =
+                    //                        SGET_OBJECT(0,
+                    //                                baseClassName, "out",
+                    //                                className);
+                    //                        BuilderInstruction35c instr3 =
+                    //                        INVOKE_VIRTUAL(2, 0, 2,
+                    //                                0, 0, 0, className,
+                    //                                methodName, params, "V");
+                    //                        Instruction instr2 =
+                    //                        INVOKE_VIRTUAL(1, 0, 0, 0, 0, 0,
+                    //                                className, methodName,
+                    //                                Lists.newArrayList(),
+                    //                                "V");
+                    List<BuilderInstruction> newInstrList =
                             new ArrayList<>(Arrays.asList(instr1, instr2,
                                     instr3));
-                    Instruction instr4 = NO_OP();
-                    instructions = new ArrayList<>(Arrays.asList(instr4));
-                    if (useLoops) {
-                        //                        String baseClassName =
-                        //                                "Ljava/lang/System;";
-                        //                        BuilderInstruction21c instr1 = SGET_OBJECT(0,
-                        //                                baseClassName, "out", className);
-//                        BuilderInstruction35c instr3 = INVOKE_VIRTUAL(2, 0, 2,
-//                                0, 0, 0, className, methodName, params, "V");
-//                        Instruction instr2 = INVOKE_VIRTUAL(1, 0, 0, 0, 0, 0,
-//                                className, methodName, Lists.newArrayList(),
-//                                "V");
-                        List<Instruction> newInstrList =
-                                new ArrayList<>(Arrays.asList(instr1, instr2
-                                        , instr3));
-                        instructions =
-                                dexFile.addForLoop(occurrence, newInstrList, 7);
-                        ImmutableMethodImplementation implLoop =
-                                new ImmutableMethodImplementation(1,
-                                        instructions, null, null);
-                        success = dexFile.addInstruction("onCreate", implLoop,
-                                true);
-                    } else {
-                        for (int i = 0; i < occurrence; i++) {
-                            ImmutableMethodImplementation implSeq =
-                                    new ImmutableMethodImplementation(1,
-                                            instructions, null, null);
-                            MethodImplementation implOrig =
-                                    callToVoidMethod(className, methodName);
-                            success = dexFile.addInstruction("onCreate",
-                                    implSeq, true);
-                            if (!success) // TODO change
-                                System.exit(-1);
-                        }
-                    }
-
-
+                    boolean atBeginning = false;
+                    int innerOffset = 8;
+                    int innerRegs = 1;
+                    instructions = dexFile.addForLoop(occurrence,
+                            newInstrList, innerOffset, innerRegs, oldOffset,
+                            atBeginning);
+                    success = dexFile.addInstructionWithLoop("onCreate",
+                            instructions, innerRegs + baseNLoopRegs,
+                            atBeginning, innerOffset);
                 } else {
-
+                    for (int i = 0; i < occurrence; i++) {
+                        List<BuilderInstruction> implOrig =
+                                callToVoidMethod(className, methodName);
+                        success = dexFile.addInstruction("onCreate", implOrig
+                                , 2, false);
+                        if (!success) // TODO change
+                            System.exit(-1);
+                    }
                 }
 
             }
@@ -176,8 +173,9 @@ public class HackingSystem {
             DexMgmt.writeDexFile(writePath, dexFile.getDexClasses(),
                     dexFile.getDexFile());
             //write the modified dex file
-            String outApkPath = Paths.get(outputDir, apkName).toString();
-            apkMng.buildApk(decodedApkPath,outApkPath);
+            String outApkPath =
+                    Paths.get(outputDir, "adv_" + apkName).toString();
+            apkMng.buildApk(decodedApkPath, outApkPath);
             //rebuilds the decoded apk into an apk file
             apkMng.signApk(outApkPath);
             //signs the apk
@@ -188,28 +186,30 @@ public class HackingSystem {
 
     }
 
-    public static MethodImplementation callToVoidMethod(String classToCall,
-                                                        String methodToCall) {
-        MethodImplementationBuilder methodImplementation =
-                new MethodImplementationBuilder(1);
+    public static List<BuilderInstruction> callToVoidMethod(String classToCall, String methodToCall) {
+        List<BuilderInstruction> methodImplementation = new ArrayList<>();
 
         if (classToCall.equals(methodToCall)) {
-            methodImplementation.addInstruction(InstructionBuilder.NEW_INSTANCE(0, classToCall));
-            methodImplementation.addInstruction(InstructionBuilder.INVOKE_DIRECT(1, 0, 0, 0, 0, 0, classToCall, methodToCall, Lists.newArrayList(), "V"));
+            methodImplementation.add(InstructionBuilder.NEW_INSTANCE(0,
+                    classToCall));
+            methodImplementation.add(InstructionBuilder.INVOKE_DIRECT(1, 0, 0
+                    , 0, 0, 0, classToCall, methodToCall,
+                    Lists.newArrayList(), "V"));
         } else {
-            methodImplementation.addInstruction(InstructionBuilder.NEW_INSTANCE(0, classToCall));
-            methodImplementation.addInstruction(INVOKE_VIRTUAL(1, 0, 0, 0, 0,
-                    0, classToCall, methodToCall, Lists.newArrayList(), "V"));
+            methodImplementation.add(InstructionBuilder.NEW_INSTANCE(0,
+                    classToCall));
+            methodImplementation.add(INVOKE_VIRTUAL(1, 0, 0, 0, 0, 0,
+                    classToCall, methodToCall, Lists.newArrayList(), "V"));
         }
 
-        return methodImplementation.getMethodImplementation();
+        return methodImplementation;
     }
 
     private static CommandLine parseArgs(String[] args) {
         Options options = new Options();
 
-        Option apkFile = new Option("inputd", "inputDir", true,
-                "input APKs' dir");
+        Option apkFile = new Option("inputd", "inputDir", true, "input APKs' "
+                + "dir");
         apkFile.setRequired(true);
         options.addOption(apkFile);
 
