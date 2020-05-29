@@ -8,6 +8,7 @@ package DexEditing;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
+import org.jf.dexlib2.AccessFlags;
 import org.jf.dexlib2.Opcode;
 import org.jf.dexlib2.builder.*;
 import org.jf.dexlib2.builder.instruction.BuilderInstruction10t;
@@ -129,114 +130,58 @@ public class Dex {
     }
 
 
-    public boolean addInstruction(String methodName,
+    public boolean addInstruction(int contClassIndex, int contMethodIndex,
                                   List<BuilderInstruction> advInstructions,
                                   int nAdvRegisters, boolean atBeginning) {
-        List<List> fullMethodList =
-                this.getallMethodImplementations(methodName);
-        List mainMethod = findMain(fullMethodList);
-        if (mainMethod.size() == 0) {
-            int nToGet = 0;
-            mainMethod = fullMethodList.get(nToGet);
-        }
-        if (mainMethod == null) {
-            return false;
-        }
-        List data = Lists.newArrayList(mainMethod);
-        int classIndex = (int) data.get(1);
-        MutableMethodImplementation oldImplementation =
-                new MutableMethodImplementation((MethodImplementation) data.get(2));
-        if (oldImplementation == null) {
-            return false;
-        } else {
-            int registerCount;
-            if (oldImplementation.getRegisterCount() >= nAdvRegisters) {
-                registerCount = oldImplementation.getRegisterCount();
-            } else {
-                registerCount =
-                        oldImplementation.getRegisterCount() + nAdvRegisters;
-            }
 
-            List<BuilderInstruction> mergedInstructions = new ArrayList<>();
-            if (isMethodEmpty(oldImplementation) || atBeginning) {
+        //        if (containerMethod.equals("addEquality"))
+        //            System.out.print("hey");
+
+        MethodImplementation container =
+                getMethodImplementationByIndex(contClassIndex, contMethodIndex);
+        MutableMethodImplementation oldImplementation =
+                new MutableMethodImplementation(container);
+
+        //        int contClassIndex = this.getClassIndex(containerClass);
+        //        int contMethodIndex = this.getMethodIndexByName
+        //        (containerClass,
+        //                containerMethod);
+
+        int registerCount;
+        if (oldImplementation.getRegisterCount() >= nAdvRegisters) {
+            registerCount = oldImplementation.getRegisterCount();
+        } else {
+            registerCount =
+                    oldImplementation.getRegisterCount() + nAdvRegisters;
+        }
+
+        List<BuilderInstruction> mergedInstructions = new ArrayList<>();
+        if (isMethodEmpty(oldImplementation) || atBeginning) {
+            mergedInstructions.addAll(advInstructions);
+            mergedInstructions.addAll(oldImplementation.getInstructions());
+        } else {
+            List<BuilderInstruction> oldInstrs =
+                    oldImplementation.getInstructions();
+            BuilderInstruction lastOldInstr =
+                    oldInstrs.get(oldInstrs.size() - 1);
+            if (lastOldInstr.getOpcode() == Opcode.THROW) {
+                mergedInstructions.addAll(oldInstrs);
                 mergedInstructions.addAll(advInstructions);
-                mergedInstructions.addAll(oldImplementation.getInstructions());
             } else {
-                List<BuilderInstruction> oldInstrs =
-                        oldImplementation.getInstructions();
                 for (int i = 0; i < oldInstrs.size() - 1; i++)
                     mergedInstructions.add(oldInstrs.get(i));
                 mergedInstructions.addAll(advInstructions);
-                mergedInstructions.add(oldInstrs.get(oldInstrs.size() - 1));
+                mergedInstructions.add(lastOldInstr);
             }
-
-            MethodImplementationBuilder advMethodImpl =
-                    new MethodImplementationBuilder(registerCount);
-            for (BuilderInstruction advInstr : mergedInstructions)
-                advMethodImpl.addInstruction(advInstr);
-
-            return modifyDexFile(methodName, classIndex,
-                    advMethodImpl.getMethodImplementation());
         }
-    }
 
-    public boolean addInstructionWithLoop(String methodName,
-                                          List<BuilderInstruction> advInstructions, int nAdvRegisters, boolean atBeginning, int innerOffset) {
-        List<List> fullMethodList =
-                this.getallMethodImplementations(methodName);
-        List mainMethod = findMain(fullMethodList);
-        if (mainMethod.size() == 0) {
-            int nToGet = 1;
-            mainMethod = fullMethodList.get(nToGet);
-        }
-        if (mainMethod == null) {
-            return false;
-        }
-        List data = Lists.newArrayList(mainMethod);
-        int classIndex = (int) data.get(1);
-        MutableMethodImplementation oldImplementation =
-                new MutableMethodImplementation((MethodImplementation) data.get(2));
-        if (oldImplementation == null) {
-            return false;
-        } else {
-            int registerCount;
-            //                        registerCount =
-            //                                oldImplementation
-            //                                .getRegisterCount() +
-            //                                        Math.abs(oldImplementation
-            //                                        .getRegisterCount() -
-            //                                        nAdvRegisters+2);
-            if (oldImplementation.getRegisterCount() >= nAdvRegisters) {
-                registerCount = oldImplementation.getRegisterCount();
-            } else {
-                registerCount =
-                        oldImplementation.getRegisterCount() + nAdvRegisters;
-            }
+        MethodImplementationBuilder advMethodImpl =
+                new MethodImplementationBuilder(registerCount);
+        for (BuilderInstruction advInstr : mergedInstructions)
+            advMethodImpl.addInstruction(advInstr);
 
-            advInstructions = putCorrectTarget(advInstructions, innerOffset,
-                    oldImplementation.getInstructions());
-
-            List<BuilderInstruction> mergedInstructions = new ArrayList<>();
-            if (isMethodEmpty(oldImplementation) || atBeginning) {
-                mergedInstructions.addAll(advInstructions);
-                mergedInstructions.addAll(oldImplementation.getInstructions());
-            } else {
-                List<BuilderInstruction> oldInstrs =
-                        oldImplementation.getInstructions();
-                for (int i = 0; i < oldInstrs.size() - 1; i++)
-                    mergedInstructions.add(oldInstrs.get(i));
-                mergedInstructions.addAll(advInstructions);
-                mergedInstructions.add(oldInstrs.get(oldInstrs.size() - 1));
-            }
-
-            MethodImplementationBuilder advMethodImpl =
-                    new MethodImplementationBuilder(registerCount);
-            for (BuilderInstruction advInstr : mergedInstructions)
-                advMethodImpl.addInstruction(advInstr);
-
-            return modifyDexFile(methodName, classIndex,
-                    advMethodImpl.getMethodImplementation());
-        }
+        return modifyDexFile(contClassIndex, contMethodIndex,
+                advMethodImpl.getMethodImplementation());
     }
 
     private List findMain(List<List> fullMethodList) {
@@ -303,6 +248,7 @@ public class Dex {
 
     }
 
+    @Deprecated
     public ImmutableList<BuilderInstruction> addForLoop(int nRepetitions,
                                                         List<BuilderInstruction> innerInstructions, int innerInstrOffset, int nInnerRegisters, int oldOffset, boolean atBeginning) {
 
@@ -337,29 +283,18 @@ public class Dex {
         return ImmutableList.copyOf(tempInstr);
     }
 
-    private boolean modifyDexFile(String methodName, int classIndex,
+    private boolean modifyDexFile(int classIndex, int methodIndex,
                                   MethodImplementation implementation) {
         ClassDef classDef = this.classes.get(classIndex);
-        List<Method> methods = Lists.newArrayList();
-        boolean modifiedMethod = false;
 
-        if (classIndex != -1) {
-            for (Method method : classDef.getMethods()) {
-                if (method.getName().equals(methodName)) {
-                    methods.add(DexBuilder.newMethod(method, implementation));
-                    modifiedMethod = true;
-                } else {
-                    methods.add(method);
-                }
-            }
-            if (modifiedMethod) {
-                this.classes.set(classIndex, DexBuilder.newClass(classDef,
-                        methods));
-            }
-            return modifiedMethod;
-        } else {
-            return modifiedMethod;
-        }
+        List<Method> newMethods = Lists.newArrayList(classDef.getMethods());
+
+        Method targetMethod = newMethods.get(methodIndex);
+        newMethods.set(methodIndex, DexBuilder.newMethod(targetMethod, implementation));
+
+        this.classes.set(classIndex, DexBuilder.newClass(classDef, newMethods));
+
+        return true;
     }
 
     private void extractClassesFromDexFile() {
@@ -375,6 +310,15 @@ public class Dex {
             }
         }
         return null;
+    }
+
+    private int getClassIndex(String className) {
+        for (int i = 0; i < this.classes.size(); i++) {
+            if (this.classes.get(i).getType().equals(className)) {
+                return i;
+            }
+        }
+        return -1;
     }
 
     private List<List> getallMethodImplementations(String methodName) {
@@ -395,7 +339,7 @@ public class Dex {
         return returnList;
     }
 
-    private List getMethodImplementation(String methodName) {
+    private List getMethodImplementationByName(String methodName) {
         /*
         Takes a method name and returns an array containing the name of the
         class
@@ -420,12 +364,88 @@ public class Dex {
         return null;
     }
 
+    private MethodImplementation getMethodImplementationByName(String className, String methodName) {
+
+        ClassDef classDef = this.getClass(className);
+
+        assert classDef != null;
+        for (Method method : classDef.getMethods()) {
+            if (method.getName().equals(methodName)) {
+                MethodImplementation m = method.getImplementation();
+                if (m == null)
+                    throw new NullPointerException("the method has not " +
+                            "implementation");
+                else return m;
+            }
+
+        }
+
+        return null;
+    }
+
+    private MethodImplementation getMethodImplementationByIndex(int classIndex, int methodIndex) {
+
+        ClassDef classDef = this.classes.get(classIndex);
+        Method method =
+                Lists.newArrayList(classDef.getMethods()).get(methodIndex);
+
+        MethodImplementation m = method.getImplementation();
+        if (m == null)
+            throw new NullPointerException("the method has not " +
+                    "implementation");
+        else return m;
+
+    }
+
+    private int getMethodIndexByName(String className, String methodName) {
+
+        ClassDef classDef = this.getClass(className);
+        List<Method> classMethods = Lists.newArrayList(classDef.getMethods());
+
+        assert classDef != null;
+        for (int i = 0; i < classMethods.size(); i++) {
+            Method currMethod = classMethods.get(i);
+            if (currMethod.getName().equals(methodName)) {
+                MethodImplementation m = currMethod.getImplementation();
+                if (m == null)
+                    throw new NullPointerException("the method has not " +
+                            "implementation");
+                else return i;
+            }
+
+        }
+
+        return -1;
+    }
+
     private boolean isMethodEmpty(MutableMethodImplementation implementation) {
         if (implementation.getInstructions().size() == 1) {
             Opcode opcode = implementation.getInstructions().get(0).getOpcode();
             return opcode.equals(Opcode.RETURN_VOID) || opcode.equals(Opcode.RETURN) || opcode.equals(Opcode.RETURN_OBJECT) || opcode.equals(Opcode.RETURN_VOID_BARRIER) || opcode.equals(Opcode.RETURN_VOID_NO_BARRIER) || opcode.equals(Opcode.RETURN_WIDE);
         }
         return false;
+    }
+
+    public List<List<Integer>> getMethodsForInjection(boolean userOnly) {
+        List<List<Integer>> outList = new ArrayList<>();
+        List<ClassDef> cDefList = Lists.newArrayList(dexFile.getClasses());
+        for (int i = 0; i < cDefList.size(); i++) {
+            ClassDef classDef = cDefList.get(i);
+            String clName = classDef.getType();
+            if (!(clName.contains("$")))
+                if (!userOnly || !(clName.contains("androidx") || clName.contains("support")))
+                    if (classDef.getAccessFlags() == AccessFlags.PUBLIC.getValue()) {
+                        List<Method> mDefList =
+                                Lists.newArrayList(classDef.getMethods());
+                        for (int j = 0; j < mDefList.size(); j++) {
+                            Method methodDef = mDefList.get(j);
+                            if (methodDef.getReturnType().equals("V") && !(methodDef.getName().contains("<") || methodDef.getImplementation() == null))
+                                outList.add(List.of(i, j));
+                        }
+                    }
+        }
+
+        return outList;
     }
 }
 

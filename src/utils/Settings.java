@@ -4,6 +4,7 @@ import java.nio.file.Paths;
 
 public final class Settings {
     public static final String DATA_DIR = "Data";
+    public static final String FEATURE_DIR = "features";
 
     public static final String RES_DIR = "res";
     public static final String APKTOOL_DIR = "ApkTool";
@@ -32,6 +33,6 @@ public final class Settings {
     public static final String CLASS_ID = "classes";
     public static final String METHOD_ID = "methods";
     // API level
-    public static final int DEF_API_LEVEL = 22;
+    public static final int DEF_API_LEVEL = 26;
 
 }

@@ -1,6 +1,7 @@
 package Main;
 
 import DexEditing.Dex;
+import DexEditing.InjectionData;
 import FileMgmt.ApkManager;
 import FileMgmt.DexMgmt;
 import FileMgmt.LoggerMgmt;
@@ -16,13 +17,15 @@ import java.io.IOException;
 import java.nio.file.DirectoryStream;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.logging.Logger;
 
 import static InstructionMgmt.InstructionBuilder.INVOKE_DIRECT;
 import static InstructionMgmt.InstructionBuilder.INVOKE_VIRTUAL;
-import static utils.FeatureUtils.getPackageNameFromFeature;
-import static utils.FeatureUtils.isSystemFeature;
+import static utils.FeatureUtils.*;
 import static utils.IOUtils.getSHA256Hash;
 import static utils.Settings.*;
 
@@ -46,14 +49,19 @@ public class HackingSystem {
         String outputDir = Paths.get(parentDir, OUT_DIR).toString();
 
         String inputApkDir = cmd.getOptionValue("inputd");
-        String featureMix = cmd.getOptionValue("fm", MIXED_ID);
+        String featureMix = cmd.getOptionValue("fm", API_ID);
         String apiSource = cmd.getOptionValue("apis", PLATFORM_ID);
         String apiDetail = cmd.getOptionValue("apid", PACKAGE_ID);
         String apiLevel = cmd.getOptionValue("apil",
                 Integer.toString(DEF_API_LEVEL));
 
-        boolean useLoops = true;
+        // feature data
+        Map<String, List<String>> availableMethods =
+                getAllUsableMethods(parentDir, featureMix, apiSource, apiLevel);
+        Map<String, String> uniqueUsableMethods =
+                getUsableMethodsPerPackage(availableMethods);
 
+        // APKs
         DirectoryStream<Path> inputStream =
                 java.nio.file.Files.newDirectoryStream(Paths.get(inputApkDir));
 
@@ -87,84 +95,55 @@ public class HackingSystem {
 
             // adversarial features loading
             // TODO implement:
-            // - load feature vector
-            // - map to feature name
+            // - load differential feature vector
+
+            // - map to package names
+            //            String packageName = getPackageNameFromFeature
+            //            (currFeature);
+
+            //                    Map<String, String> instrInfoMap =
+            //                            getSuitableSystemMethod
+            //                            (packageName);
+            //                    String className = instrInfoMap.get
+            //                    ("class");
+            //                    String methodName = instrInfoMap
+            //                    .get("method");
+
+            // - map package name to call to add
             Map<String, Integer> featuresToAdd = new HashMap<>();
-            featuresToAdd.put("android.net.wifi.p2p.WifiP2pDevice", 3);
-            for (Map.Entry<String, Integer> entry : featuresToAdd.entrySet()) {
-                String currFeature = entry.getKey();
-                int occurrence = entry.getValue();
+            featuresToAdd.put("android/net/wifi/p2p/WifiP2pDevice@hashCode" + "&I", 300);
+            featuresToAdd.put("android/animation/AnimatorSet@clone&Landroid" + "/animation/AnimatorSet;", 300);
 
-                String packageName = getPackageNameFromFeature(currFeature);
-                if (!isSystemFeature(packageName)) break;
+            // - get APK available methods for injection
+            List<List<Integer>> methodsForInjection =
+                    dexFile.getMethodsForInjection(false);
 
-                //                    Map<String, String> instrInfoMap =
-                //                            getSuitableSystemMethod
-                //                            (packageName);
-                //                    String className = instrInfoMap.get
-                //                    ("class");
-                //                    String methodName = instrInfoMap
-                //                    .get("method");
+            // - randomly associate a new call to a method
+            List<InjectionData> injectionMap =
+                    pairFeatureToMethod(methodsForInjection, featuresToAdd);
 
+            for (InjectionData entry : injectionMap) {
 
-                String className = "Landroid/net/wifi/p2p/WifiP2pDevice;";
-                String methodName = "describeContents";
-                List<String> params = new ArrayList<>();
-                //                params.add("I");
+                int containerClass = entry.getClassIndex();
+                int containerMethod = entry.getMethodIndex();
+                String currFeature = entry.getFeatureName();
 
-                int baseNLoopRegs = 2;
-                int oldOffset = 3;
-                BuilderInstruction21c instr1 =
-                        InstructionBuilder.NEW_INSTANCE(1, className);
-                //                    BuilderInstruction11n instr2 =
-                //                    CONST_4_Instr(oldOffset+2,
-                //                            5 );
-                BuilderInstruction35c instr2 = INVOKE_DIRECT(1, 1, 0, 0, 0, 0
-                        , className, "<init>", Lists.newArrayList(), "V");
-                BuilderInstruction35c instr3 = INVOKE_VIRTUAL(1, 1, 0, 0, 0,
-                        0, className, methodName, params, "V");
-                List<BuilderInstruction> instructions = new ArrayList<>();
-                //                    Instruction instr4 = NO_OP();
-                //                    instructions = new ArrayList<>(Arrays
-                //                    .asList(instr4));
-                if (useLoops) {
-                    //                        String baseClassName =
-                    //                                "Ljava/lang/System;";
-                    //                        BuilderInstruction21c instr1 =
-                    //                        SGET_OBJECT(0,
-                    //                                baseClassName, "out",
-                    //                                className);
-                    //                        BuilderInstruction35c instr3 =
-                    //                        INVOKE_VIRTUAL(2, 0, 2,
-                    //                                0, 0, 0, className,
-                    //                                methodName, params, "V");
-                    //                        Instruction instr2 =
-                    //                        INVOKE_VIRTUAL(1, 0, 0, 0, 0, 0,
-                    //                                className, methodName,
-                    //                                Lists.newArrayList(),
-                    //                                "V");
-                    List<BuilderInstruction> newInstrList =
-                            new ArrayList<>(Arrays.asList(instr1, instr2,
-                                    instr3));
-                    boolean atBeginning = false;
-                    int innerOffset = 8;
-                    int innerRegs = 1;
-                    instructions = dexFile.addForLoop(occurrence,
-                            newInstrList, innerOffset, innerRegs, oldOffset,
-                            atBeginning);
-                    success = dexFile.addInstructionWithLoop("onCreate",
-                            instructions, innerRegs + baseNLoopRegs,
-                            atBeginning, innerOffset);
-                } else {
-                    for (int i = 0; i < occurrence; i++) {
-                        List<BuilderInstruction> implOrig =
-                                callToVoidMethod(className, methodName);
-                        success = dexFile.addInstruction("onCreate", implOrig
-                                , 2, false);
-                        if (!success) // TODO change
-                            System.exit(-1);
-                    }
-                }
+                String className = getClassNameFromFeature(currFeature);
+                String methodName = getMethodNameFromFeature(currFeature);
+                String returnClass = getReturnTypeFromFeature(currFeature);
+
+                List<BuilderInstruction> instructions =
+                        callConstructorAndMethod(className, methodName,
+                                returnClass);
+
+                //                List<BuilderInstruction> implOrig =
+                //                        callToVoidMethod(className,
+                //                        methodName);
+                success = dexFile.addInstruction(containerClass,
+                        containerMethod, instructions, 1, false);
+                if (!success) // TODO change
+                    System.exit(-1);
+
 
             }
 
@@ -184,6 +163,19 @@ public class HackingSystem {
         }
 
 
+    }
+
+    private static List<BuilderInstruction> callConstructorAndMethod(String className, String methodName, String returnClass) {
+        List<String> params = new ArrayList<>();
+        int regNumber = 0;
+
+        BuilderInstruction21c instr1 =
+                InstructionBuilder.NEW_INSTANCE(regNumber, className);
+        BuilderInstruction35c instr2 = INVOKE_DIRECT(1, regNumber, 0, 0, 0, 0
+                , className, "<init>", Lists.newArrayList(), "V");
+        BuilderInstruction35c instr3 = INVOKE_VIRTUAL(1, regNumber, 0, 0, 0,
+                0, className, methodName, params, returnClass);
+        return List.of(instr1, instr2, instr3);
     }
 
     public static List<BuilderInstruction> callToVoidMethod(String classToCall, String methodToCall) {
