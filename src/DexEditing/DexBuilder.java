@@ -5,13 +5,10 @@
  */
 package DexEditing;
 
-import InstructionMgmt.InstructionBuilder;
+import InjectionMgmt.InstructionBuilder;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
 import org.jf.dexlib2.AccessFlags;
 import org.jf.dexlib2.Opcode;
 import org.jf.dexlib2.builder.BuilderInstruction;
@@ -24,6 +21,10 @@ import org.jf.dexlib2.iface.MethodParameter;
 import org.jf.dexlib2.immutable.ImmutableAnnotation;
 import org.jf.dexlib2.immutable.ImmutableClassDef;
 import org.jf.dexlib2.immutable.ImmutableMethod;
+
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 /**
  *
  * @author fabri

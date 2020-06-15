@@ -5,39 +5,26 @@
  */
 package DexEditing;
 
-import static javafx.application.Platform.exit;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
- *
  * @author fabri
  */
-class ReturnType {
-    private static String returnString = "S";
-    private static String returnInt = "I";
-    private static String returnVoid = "V";
+public class ReturnType {
+    static final Map<String, String> primitiveMapping = new HashMap<>() {{
+        put("int", "I");
+        put("boolean", "Z");
+        put("byte", "B");
+        put("short", "S");
+        put("char", "C");
+        put("long", "J");
+        put("float", "F");
+        put("double", "D");
+        put("void", "V");
+    }};
 
-    private static String getReturnString() {
-        return returnString;
-    }
-
-    private static String getReturnInt() {
-        return returnInt;
-    }
-
-    private static String getReturnVoid() {
-        return returnVoid;
-    }
-    
-        
-    protected static String getReturnTypeFromString(String returnType){
-        switch(returnType.toLowerCase()){
-            case "string": return getReturnString();
-            case "int": return getReturnInt();
-            case "void": return getReturnVoid();
-            default:
-                System.err.println("ReturnType not recognized!!");
-                exit();
-        }
-        return null;
+    public static String getReturnTypeFromString(String inputType) {
+        return primitiveMapping.getOrDefault(inputType, null);
     }
 }

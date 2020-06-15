@@ -16,6 +16,7 @@ import org.jf.dexlib2.builder.instruction.BuilderInstruction11n;
 import org.jf.dexlib2.builder.instruction.BuilderInstruction22b;
 import org.jf.dexlib2.builder.instruction.BuilderInstruction22t;
 import org.jf.dexlib2.iface.*;
+import org.jf.dexlib2.iface.instruction.Instruction;
 import org.jf.dexlib2.immutable.ImmutableAnnotation;
 import org.jf.dexlib2.immutable.ImmutableClassDef;
 import org.jf.dexlib2.immutable.ImmutableMethod;
@@ -23,26 +24,33 @@ import org.jf.dexlib2.immutable.ImmutableMethod;
 import java.io.IOException;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
+import java.util.stream.Collectors;
 
 
 /**
  * @author fabri
  */
-public class Dex {
+public class DexManager {
     private final int apiLevel;
     private final DexFile dexFile;
+    private final String dexPath;
+    private final String dexName;
     private final List<ClassDef> classes;
 
     //constructor
-    public Dex(DexFile dexFile) {
-        this.apiLevel = dexFile.getOpcodes().api;
+    public DexManager(DexFile dexFile, String dexFilePath) {
+
+        this.dexPath = dexFilePath;
+        dexName = Paths.get(this.getDexPath()).getFileName().toString();
         this.dexFile = dexFile;
-        this.classes = Lists.newArrayList();
-        extractClassesFromDexFile();
+
+        this.apiLevel = this.dexFile.getOpcodes().api;
+        this.classes = Lists.newArrayList(this.dexFile.getClasses());
     }
 
     public DexFile getDexFile() {
@@ -290,7 +298,8 @@ public class Dex {
         List<Method> newMethods = Lists.newArrayList(classDef.getMethods());
 
         Method targetMethod = newMethods.get(methodIndex);
-        newMethods.set(methodIndex, DexBuilder.newMethod(targetMethod, implementation));
+        newMethods.set(methodIndex, DexBuilder.newMethod(targetMethod,
+                implementation));
 
         this.classes.set(classIndex, DexBuilder.newClass(classDef, newMethods));
 
@@ -427,6 +436,7 @@ public class Dex {
     }
 
     public List<List<Integer>> getMethodsForInjection(boolean userOnly) {
+
         List<List<Integer>> outList = new ArrayList<>();
         List<ClassDef> cDefList = Lists.newArrayList(dexFile.getClasses());
         for (int i = 0; i < cDefList.size(); i++) {
@@ -439,13 +449,56 @@ public class Dex {
                                 Lists.newArrayList(classDef.getMethods());
                         for (int j = 0; j < mDefList.size(); j++) {
                             Method methodDef = mDefList.get(j);
-                            if (methodDef.getReturnType().equals("V") && !(methodDef.getName().contains("<") || methodDef.getImplementation() == null))
-                                outList.add(List.of(i, j));
+                            if (methodDef.getReturnType().equals("V") && !(methodDef.getName().contains("<") || methodDef.getImplementation() == null)) {
+                                List<? extends Instruction> mInstrs =
+                                        Lists.newArrayList(methodDef.getImplementation().getInstructions());
+                                List<String> opcList =
+                                        mInstrs.stream().map(a -> a.getOpcode().name).collect(Collectors.toList());
+                                if (!(opcList.contains("packed-switch") || opcList.contains("sparse-switch")))
+                                    if (!opcList.contains("goto"))
+                                        if (!opcList.contains("fill-array" +
+                                                "-data"))
+                                            outList.add(List.of(i, j));
+                            }
                         }
                     }
         }
 
         return outList;
     }
+
+    public String getDexPath() {
+        return dexPath;
+    }
+
+    public int getApiLevel() {
+        return apiLevel;
+    }
+
+    public String getDexName() {
+        return dexName;
+    }
+
+    // todo finish implementation
+    /*public List<List<Integer>> getMethodsForInjectionHeavy(boolean userOnly) {
+        int nClasses = dexFile.getClasses().size();
+        List<ClassDef> cDefList = Lists.newArrayList(dexFile.getClasses());
+
+        return IntStream.range(0, nClasses)
+                .mapToObj(i->new AbstractMap.SimpleEntry<Integer, String>(i,
+                cDefList.get(i).getType()))
+                .filter(el->!el.getValue().contains("$"))
+                .filter(el->!(!userOnly || !(el.getValue().contains
+                ("androidx") || el.getValue().contains("support"))))
+                .filter(el-> cDefList.get(el.getKey()).getAccessFlags()
+                ==AccessFlags.PUBLIC.getValue())
+                .map(el->new AbstractMap.SimpleEntry<Integer, Iterable>(el
+                .getKey(),
+                        cDefList.get(el.getKey()).getMethods()))
+                .map(el-> new Object[]{el.getKey(), IntStream.range(0,
+                        Lists.newArrayList(el.getValue()).size()),
+                        el.getValue()}));
+
+    }*/
 }
 

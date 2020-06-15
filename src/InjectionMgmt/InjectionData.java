@@ -1,4 +1,4 @@
-package DexEditing;
+package InjectionMgmt;
 
 public class InjectionData {
     private final int classIndex;

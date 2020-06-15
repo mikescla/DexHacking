@@ -1,201 +1,144 @@
 package Main;
 
-import DexEditing.Dex;
-import DexEditing.InjectionData;
+import DexEditing.DexManager;
 import FileMgmt.ApkManager;
 import FileMgmt.DexMgmt;
-import FileMgmt.LoggerMgmt;
-import InstructionMgmt.InstructionBuilder;
-import com.google.common.collect.Lists;
-import com.google.common.io.Files;
+import InjectionMgmt.InjectionManager;
+import lanchon.multidexlib2.BasicDexFileNamer;
+import lanchon.multidexlib2.MultiDexIO;
 import org.apache.commons.cli.*;
-import org.jf.dexlib2.builder.BuilderInstruction;
-import org.jf.dexlib2.builder.instruction.BuilderInstruction21c;
-import org.jf.dexlib2.builder.instruction.BuilderInstruction35c;
+import org.jf.dexlib2.iface.DexFile;
+import utils.LoggerMgmt;
 
+import java.io.File;
 import java.io.IOException;
 import java.nio.file.DirectoryStream;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.HashMap;
+import java.text.MessageFormat;
 import java.util.List;
 import java.util.Map;
 import java.util.logging.Logger;
 
-import static InstructionMgmt.InstructionBuilder.INVOKE_DIRECT;
-import static InstructionMgmt.InstructionBuilder.INVOKE_VIRTUAL;
-import static utils.FeatureUtils.*;
-import static utils.IOUtils.getSHA256Hash;
+import static utils.FeatureUtils.loadAdversarialData;
+import static utils.IOUtils.findFiles;
+import static utils.IOUtils.parseTextFile;
 import static utils.Settings.*;
 
 /**
- * @author fabri
+ * @author Michele Scalas
  */
 public class HackingSystem {
 
     public static void main(String[] args) throws IOException {
-        // logging
+        /*LOGGING*/
         Logger logger = LoggerMgmt.getLogger();
 
-        // argument parsing
+        /*ARGUMENT PARSING*/
         CommandLine cmd = parseArgs(args);
 
         String parentDir =
                 Paths.get(System.getProperty("user.dir")).getParent().toString();
-        String resourceDir = cmd.getOptionValue("res", Paths.get(parentDir,
-                RES_DIR).toString());
-        String decodedApkDir = Paths.get(parentDir, TEMP_DIR).toString();
-        String outputDir = Paths.get(parentDir, OUT_DIR).toString();
 
         String inputApkDir = cmd.getOptionValue("inputd");
         String featureMix = cmd.getOptionValue("fm", API_ID);
         String apiSource = cmd.getOptionValue("apis", PLATFORM_ID);
         String apiDetail = cmd.getOptionValue("apid", PACKAGE_ID);
-        String apiLevel = cmd.getOptionValue("apil",
+        String refApiLevel = cmd.getOptionValue("apil",
                 Integer.toString(DEF_API_LEVEL));
 
-        // feature data
-        Map<String, List<String>> availableMethods =
-                getAllUsableMethods(parentDir, featureMix, apiSource, apiLevel);
-        Map<String, String> uniqueUsableMethods =
-                getUsableMethodsPerPackage(availableMethods);
+        /*ADVERSARIAL FEATURES LOADING*/
 
-        // APKs
-        DirectoryStream<Path> inputStream =
-                java.nio.file.Files.newDirectoryStream(Paths.get(inputApkDir));
+        // load differential feature vector
+        Map<String, Map<Integer, Integer>> advVectors =
+                loadAdversarialData(featureMix, apiDetail, apiSource,
+                        refApiLevel, parentDir);
+        // get attacked classifier's feature reference
+        List<String> featureNamesRef = parseTextFile(Paths.get(parentDir,
+                DATA_DIR, FEATURE_DIR, MessageFormat.format("{0}_{1}_{2" +
+                        "}_upto_{3}.txt", featureMix, apiDetail, apiSource,
+                        refApiLevel)).toString());
 
-        for (Path apk : inputStream) {
-            ApkManager apkMng = new ApkManager();
-            Dex dexFile = null;
-            boolean success = false;
+        /*APK FILES LISTING*/
+        Map<String, String> availableApks = findFiles(inputApkDir);
 
-            String baseApkName = Files.getNameWithoutExtension(apk.toString());
-            String apkName = apk.getFileName().toString();
-            String apkPath = apk.toString();
-            String apkHash = getSHA256Hash(apkPath);
+        /*INJECTION*/
+        advVectors.entrySet().parallelStream().forEach(apkEntry -> {
+            // check file presence
+            String advHash = apkEntry.getKey();
 
-            String decodedApkPath =
-                    Paths.get(decodedApkDir, baseApkName).toString();
-            apkMng.decodeApk(apkPath, decodedApkPath);
+            if (!availableApks.containsKey(advHash)) {
+                logger.info(advHash + " not present. Skipped.");
+                return;
+            } else logger.info("Modifying " + advHash);
 
-            DirectoryStream<Path> decodedApkStream =
-                    java.nio.file.Files.newDirectoryStream(Paths.get(decodedApkPath));
-            dexFile = null;
-            String dexPath = null;
-            // TODO: implement support multiple dex files
+
+            Path apk = Paths.get(availableApks.get(advHash));
+            ApkManager apkMng = new ApkManager(apk, logger);
+
+            // decode apk
+            int decCode = apkMng.decodeApk();
+            if (decCode != 0) {
+                logger.info("Could not decode APK. Skipped");
+                return;
+            }
+
+            DexManager dexMng = null;
+
+            // get api level
+            DexFile dFile;
+            try {
+                dFile = MultiDexIO.readDexFile(true,
+                        new File(apkMng.getApkPath()),
+                        new BasicDexFileNamer(), null, null);
+            } catch (IOException e) {
+                e.printStackTrace();
+                return;
+            }
+            String apkApiLevel = String.valueOf(dFile.getOpcodes().api);
+
+            // search dex file(s)
+            DirectoryStream<Path> decodedApkStream;
+            try {
+                decodedApkStream =
+                        java.nio.file.Files.newDirectoryStream(Paths.get(apkMng.getDecodedApkDir()));
+            } catch (IOException e) {
+                e.printStackTrace();
+                return;
+            }
+            // TODO: support multiple dex files
+            /*MultiDexContainer<DexBackedDexFile> multiDFile =
+                    MultiDexIO.readMultiDexContainer(new File(apkPath),
+                            new BasicDexFileNamer(), dFile.getOpcodes());*/
             for (Path decodedFile : decodedApkStream) {
                 if (decodedFile.toString().contains(".dex")) {
-                    dexFile =
-                            new Dex(DexMgmt.loadDexFile(decodedFile.toString(), DEF_API_LEVEL));
-                    dexPath = decodedFile.toString();
+                    dexMng =
+                            new DexManager(DexMgmt.loadDexFile(decodedFile.toString(), Integer.parseInt(apkApiLevel)), decodedFile.toString());
                     break;
                 }
             }
 
-            // adversarial features loading
-            // TODO implement:
-            // - load differential feature vector
-
-            // - map to package names
-            //            String packageName = getPackageNameFromFeature
-            //            (currFeature);
-
-            //                    Map<String, String> instrInfoMap =
-            //                            getSuitableSystemMethod
-            //                            (packageName);
-            //                    String className = instrInfoMap.get
-            //                    ("class");
-            //                    String methodName = instrInfoMap
-            //                    .get("method");
-
-            // - map package name to call to add
-            Map<String, Integer> featuresToAdd = new HashMap<>();
-            featuresToAdd.put("android/net/wifi/p2p/WifiP2pDevice@hashCode" + "&I", 300);
-            featuresToAdd.put("android/animation/AnimatorSet@clone&Landroid" + "/animation/AnimatorSet;", 300);
-
-            // - get APK available methods for injection
-            List<List<Integer>> methodsForInjection =
-                    dexFile.getMethodsForInjection(false);
-
-            // - randomly associate a new call to a method
-            List<InjectionData> injectionMap =
-                    pairFeatureToMethod(methodsForInjection, featuresToAdd);
-
-            for (InjectionData entry : injectionMap) {
-
-                int containerClass = entry.getClassIndex();
-                int containerMethod = entry.getMethodIndex();
-                String currFeature = entry.getFeatureName();
-
-                String className = getClassNameFromFeature(currFeature);
-                String methodName = getMethodNameFromFeature(currFeature);
-                String returnClass = getReturnTypeFromFeature(currFeature);
-
-                List<BuilderInstruction> instructions =
-                        callConstructorAndMethod(className, methodName,
-                                returnClass);
-
-                //                List<BuilderInstruction> implOrig =
-                //                        callToVoidMethod(className,
-                //                        methodName);
-                success = dexFile.addInstruction(containerClass,
-                        containerMethod, instructions, 1, false);
-                if (!success) // TODO change
-                    System.exit(-1);
-
-
+            if (dexMng == null) {
+                logger.info("Not an apk file. Skipped.");
+                return;
             }
 
-            String dexName = Paths.get(dexPath).getFileName().toString();
-            String writePath = Paths.get(decodedApkPath, dexName).toString();
-            DexMgmt.writeDexFile(writePath, dexFile.getDexClasses(),
-                    dexFile.getDexFile());
-            //write the modified dex file
-            String outApkPath =
-                    Paths.get(outputDir, "adv_" + apkName).toString();
-            apkMng.buildApk(decodedApkPath, outApkPath);
-            //rebuilds the decoded apk into an apk file
-            apkMng.signApk(outApkPath);
-            //signs the apk
-            logger.info("Apk " + apkName + " successfully edited!");
+            // inject features
+            InjectionManager injMng = new InjectionManager(apkMng, dexMng,
+                    featureMix, apiSource, apiDetail, refApiLevel,
+                    featureNamesRef, logger);
 
-        }
+            Map<Integer, Integer> advFeatures = apkEntry.getValue();
+            injMng.injectFeatures(advFeatures);
+
+            // build and sign apk
+            injMng.finaliseApk();
+
+        });
 
 
     }
 
-    private static List<BuilderInstruction> callConstructorAndMethod(String className, String methodName, String returnClass) {
-        List<String> params = new ArrayList<>();
-        int regNumber = 0;
-
-        BuilderInstruction21c instr1 =
-                InstructionBuilder.NEW_INSTANCE(regNumber, className);
-        BuilderInstruction35c instr2 = INVOKE_DIRECT(1, regNumber, 0, 0, 0, 0
-                , className, "<init>", Lists.newArrayList(), "V");
-        BuilderInstruction35c instr3 = INVOKE_VIRTUAL(1, regNumber, 0, 0, 0,
-                0, className, methodName, params, returnClass);
-        return List.of(instr1, instr2, instr3);
-    }
-
-    public static List<BuilderInstruction> callToVoidMethod(String classToCall, String methodToCall) {
-        List<BuilderInstruction> methodImplementation = new ArrayList<>();
-
-        if (classToCall.equals(methodToCall)) {
-            methodImplementation.add(InstructionBuilder.NEW_INSTANCE(0,
-                    classToCall));
-            methodImplementation.add(InstructionBuilder.INVOKE_DIRECT(1, 0, 0
-                    , 0, 0, 0, classToCall, methodToCall,
-                    Lists.newArrayList(), "V"));
-        } else {
-            methodImplementation.add(InstructionBuilder.NEW_INSTANCE(0,
-                    classToCall));
-            methodImplementation.add(INVOKE_VIRTUAL(1, 0, 0, 0, 0, 0,
-                    classToCall, methodToCall, Lists.newArrayList(), "V"));
-        }
-
-        return methodImplementation;
-    }
 
     private static CommandLine parseArgs(String[] args) {
         Options options = new Options();
