@@ -6,13 +6,15 @@
 package FileMgmt;
 
 import com.google.common.io.Files;
+import org.apache.commons.io.FileUtils;
+import org.apache.commons.io.IOUtils;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.text.MessageFormat;
-import java.util.Scanner;
 import java.util.logging.Logger;
 
 import static utils.Settings.*;
@@ -57,16 +59,16 @@ public class ApkManager {
                     Runtime.getRuntime().exec("jarsigner -storepass " +
                             "keykey -sigalg SHA1withRSA -digestalg SHA1 " +
                             "-keystore \"" + this.signKeyPath + "\" \"" + apkPath + "\" Key");
-            Scanner scanner = new Scanner(cmd.getErrorStream());
-            while (scanner.hasNext()) {
-                System.out.println(scanner.nextLine());
-            }
-            cmd.waitFor();
+            int exitCode = cmd.waitFor();
+            if (exitCode != 0)
+                logger.severe(IOUtils.toString(cmd.getErrorStream(),
+                        StandardCharsets.UTF_8));
+
             cmd.destroy();
         } catch (IOException ex) {
-            System.out.println("Error! File not Found");
+            logger.severe("Error! File not Found");
         } catch (InterruptedException ex) {
-            System.out.println("Error! Execution interrupted!");
+            logger.severe("Error! Execution interrupted!");
         }
     }
 
@@ -74,21 +76,18 @@ public class ApkManager {
         try {
             Process cmd =
                     Runtime.getRuntime().exec("java -jar \"" + this.apkToolPath + "\" d -r -s -f -o \"" + this.decodedApkDir + "\" \"" + this.apkPath + "\"");
+
             int exitCode = cmd.waitFor();
             cmd.destroy();
             if (exitCode != 0) {
-                Scanner scanner = new Scanner(cmd.getErrorStream());
-                while (scanner.hasNext()) {
-                    this.logger.severe(scanner.nextLine());
-                }
+                logger.severe(IOUtils.toString(cmd.getErrorStream(),
+                        StandardCharsets.UTF_8));
                 return exitCode;
-                //                throw new IOException("Command exited with
-                //                " + exitCode);
             } else return 0;
         } catch (IOException ex) {
-            System.out.println("Error! File not Found");
+            logger.severe("Error! File not Found");
         } catch (InterruptedException ex) {
-            System.out.println("Error! Execution interrupted!");
+            logger.severe("Error! Execution interrupted!");
         }
         return 0;
     }
@@ -96,32 +95,21 @@ public class ApkManager {
     public void buildApk(String apkPath, int apkApiLevel, String outputPath) {
         try {
             Process cmd = Runtime.getRuntime().exec(MessageFormat.format(
-                    "java -jar \"{0}\" b --force-all --debug -api {3}" + " -o" +
-                            " " + "\"{1}\" \"{2}\" ", this.apkToolPath,
-                    outputPath, apkPath, apkApiLevel));
-            Scanner scanner = new Scanner(cmd.getErrorStream());
-            while (scanner.hasNext()) {
-                System.out.println(scanner.nextLine());
-            }
-            cmd.waitFor();
-            cmd.destroy();
-            File apkDir = new File(apkPath);
-            deleteDirectory(apkDir);
-        } catch (IOException ex) {
-            System.out.println("Error! File not Found");
-        } catch (InterruptedException ex) {
-            System.out.println("Error! Execution interrupted!");
-        }
-    }
+                    "java -jar \"{0}\" b --force-all --debug -api {3}" + " " + "-o" + " " + "\"{1}\" \"{2}\" ", this.apkToolPath, outputPath, apkPath, apkApiLevel));
 
-    private void deleteDirectory(File dir) {
-        if (dir.isDirectory()) {
-            File[] children = dir.listFiles();
-            for (int i = 0; i < children.length; i++) {
-                deleteDirectory(children[i]);
-            }
+            int exitCode = cmd.waitFor();
+            if (exitCode != 0)
+                logger.severe(IOUtils.toString(cmd.getErrorStream(),
+                        StandardCharsets.UTF_8));
+
+            cmd.destroy();
+
+            FileUtils.deleteDirectory(new File(apkPath));
+        } catch (IOException ex) {
+            logger.severe("Error! File not Found");
+        } catch (InterruptedException ex) {
+            logger.severe("Error! Execution interrupted!");
         }
-        dir.delete();
     }
 
     // GETTERS

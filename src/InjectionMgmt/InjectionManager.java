@@ -23,8 +23,7 @@ import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import static InjectionMgmt.InstructionBuilder.INVOKE_DIRECT;
-import static InjectionMgmt.InstructionBuilder.INVOKE_VIRTUAL;
+import static InjectionMgmt.InstructionBuilder.*;
 import static java.util.stream.Collectors.*;
 import static utils.FeatureUtils.*;
 import static utils.Settings.*;
@@ -48,11 +47,14 @@ public class InjectionManager {
     private final DexManager dexMng;
 
     private final Map<String, String> uniqueUsableMethods;
+    private final boolean injectMethods;
 
+    // TODO: add permission injection if required by API
     public InjectionManager(ApkManager apkMng, DexManager dexMng,
                             String featureMix, String apiSource,
                             String apiDetail, String refApiLevel,
-                            List<String> refFeatureNames, Logger logger) {
+                            List<String> refFeatureNames,
+                            boolean injectMethods, Logger logger) {
 
         this.logger = logger;
 
@@ -65,6 +67,8 @@ public class InjectionManager {
 
         this.refApiLevel = refApiLevel;
         this.refFeatureNames = refFeatureNames;
+
+        this.injectMethods = injectMethods;
 
         // GET AVAILABLE METHODS
         this.uniqueUsableMethods = this.getSingleUsableApi();
@@ -85,10 +89,22 @@ public class InjectionManager {
         return List.of(instr1, instr2, instr3);
     }
 
+    private static List<BuilderInstruction> callConstructor(String className) {
+        List<String> params = new ArrayList<>();
+        int regNumber = 0;
+
+        BuilderInstruction21c instr1 =
+                InstructionBuilder.NEW_INSTANCE(regNumber, className);
+        BuilderInstruction35c instr2 = INVOKE_DIRECT(1, regNumber, 0, 0, 0, 0
+                , className, "<init>", Lists.newArrayList(), "V");
+        return List.of(instr1, instr2);
+    }
+
     public String getOutApkPath() {
-        return Paths.get(outputDir, MessageFormat.format("noparams_{0}_{1}_{2" +
-                "}_upto_{3}", this.featureMix, this.apiDetail, this.apiSource
-                , this.refApiLevel), "adv_" + apkMng.getApkName()).toString();
+        return Paths.get(outputDir, MessageFormat.format("noparams_{0}_{1}_{2"
+                + "}_upto_{3}_meth{4}", this.featureMix, this.apiDetail,
+                this.apiSource, this.refApiLevel, this.injectMethods),
+                "adv_" + apkMng.getApkName()).toString();
     }
 
     private Map<String, List<String>> getAllUsableApiPerDetail() {
@@ -203,10 +219,20 @@ public class InjectionManager {
             String className = getClassNameFromFeature(currFeature);
             String methodName = getMethodNameFromFeature(currFeature);
             String returnClass = getReturnTypeFromFeature(currFeature);
+            boolean isStatic = checkIfStaticFromFeature(currFeature);
 
-            List<BuilderInstruction> instructions =
-                    callConstructorAndMethod(className, methodName,
+            List<BuilderInstruction> instructions;
+            if (this.injectMethods) {
+                if (isStatic)
+                    instructions = callStaticMethod(className, methodName,
                             returnClass);
+                else
+                    instructions = callConstructorAndMethod(className,
+                            methodName, returnClass);
+            } else {
+                instructions = callConstructor(className);
+            }
+
 
             boolean success = dexMng.addInstruction(containerClass,
                     containerMethod, instructions, 1, false);
@@ -217,6 +243,18 @@ public class InjectionManager {
         }
 
 
+    }
+
+    private List<BuilderInstruction> callStaticMethod(String className,
+                                                      String methodName,
+                                                      String returnClass) {
+        List<String> params = new ArrayList<>();
+        int regNumber = 0;
+
+        BuilderInstruction35c instr = INVOKE_STATIC(0, 0, 0, 0, 0, 0,
+                className, methodName, params, returnClass);
+
+        return List.of(instr);
     }
 
     public void finaliseApk() {

@@ -16,7 +16,7 @@ import java.util.logging.*;
 /**
  * @author fabri
  */
-public class LoggerMgmt {
+public class LoggerMgmt { //TODO: switch to slf4j
 
     public static Logger getLogger() throws IOException {
         String callerName =
@@ -36,7 +36,9 @@ public class LoggerMgmt {
         Logger logger = Logger.getLogger("DexHackingLogger");
 
         FileHandler fh = new FileHandler(logFilePath);
+        fh.setLevel(Level.ALL);
         ConsoleHandler ch = new ConsoleHandler();
+        ch.setLevel(Level.ALL);
 
         SimpleFormatter formatter = new SimpleFormatter();
         fh.setFormatter(formatter);
@@ -48,7 +50,6 @@ public class LoggerMgmt {
         System.setProperty("java.util.logging.SimpleFormatter.format", "%5$s:" +
                 " " + "%6$s %n");
         logger.setUseParentHandlers(false);
-        logger.setLevel(Level.ALL);
 
         return logger;
     }

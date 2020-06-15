@@ -18,11 +18,12 @@ import java.nio.file.Paths;
 import java.text.MessageFormat;
 import java.util.List;
 import java.util.Map;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import static utils.FeatureUtils.loadAdversarialData;
-import static utils.IOUtils.findFiles;
-import static utils.IOUtils.parseTextFile;
+import static utils.FileUtils.findFiles;
+import static utils.FileUtils.parseTextFile;
 import static utils.Settings.*;
 
 /**
@@ -46,6 +47,8 @@ public class HackingSystem {
         String apiDetail = cmd.getOptionValue("apid", PACKAGE_ID);
         String refApiLevel = cmd.getOptionValue("apil",
                 Integer.toString(DEF_API_LEVEL));
+        boolean injectMethods = Boolean.parseBoolean(cmd.getOptionValue(
+                "injmeths", "true"));
 
         /*ADVERSARIAL FEATURES LOADING*/
 
@@ -68,10 +71,9 @@ public class HackingSystem {
             String advHash = apkEntry.getKey();
 
             if (!availableApks.containsKey(advHash)) {
-                logger.info(advHash + " not present. Skipped.");
+                logger.warning(advHash + " not present. Skipped.");
                 return;
-            } else logger.info("Modifying " + advHash);
-
+            }
 
             Path apk = Paths.get(availableApks.get(advHash));
             ApkManager apkMng = new ApkManager(apk, logger);
@@ -79,11 +81,9 @@ public class HackingSystem {
             // decode apk
             int decCode = apkMng.decodeApk();
             if (decCode != 0) {
-                logger.info("Could not decode APK. Skipped");
+                logger.warning("Could not decode APK. Skipped");
                 return;
             }
-
-            DexManager dexMng = null;
 
             // get api level
             DexFile dFile;
@@ -91,11 +91,14 @@ public class HackingSystem {
                 dFile = MultiDexIO.readDexFile(true,
                         new File(apkMng.getApkPath()),
                         new BasicDexFileNamer(), null, null);
-            } catch (IOException e) {
-                e.printStackTrace();
+            } catch (IOException ioe) {
+                logger.log(Level.SEVERE, ioe.getMessage(), ioe);
                 return;
             }
             String apkApiLevel = String.valueOf(dFile.getOpcodes().api);
+
+            logger.info(MessageFormat.format("Modifying {0} (level {1})",
+                    advHash, apkApiLevel));
 
             // search dex file(s)
             DirectoryStream<Path> decodedApkStream;
@@ -110,6 +113,7 @@ public class HackingSystem {
             /*MultiDexContainer<DexBackedDexFile> multiDFile =
                     MultiDexIO.readMultiDexContainer(new File(apkPath),
                             new BasicDexFileNamer(), dFile.getOpcodes());*/
+            DexManager dexMng = null;
             for (Path decodedFile : decodedApkStream) {
                 if (decodedFile.toString().contains(".dex")) {
                     dexMng =
@@ -126,7 +130,7 @@ public class HackingSystem {
             // inject features
             InjectionManager injMng = new InjectionManager(apkMng, dexMng,
                     featureMix, apiSource, apiDetail, refApiLevel,
-                    featureNamesRef, logger);
+                    featureNamesRef, injectMethods, logger);
 
             Map<Integer, Integer> advFeatures = apkEntry.getValue();
             injMng.injectFeatures(advFeatures);
@@ -169,6 +173,11 @@ public class HackingSystem {
         Option apiLevel = new Option("apil", "apiLevel", true, "Api level");
         apiLevel.setRequired(false);
         options.addOption(apiLevel);
+
+        Option injMeths = new Option("injmeths", "injectmethods", false,
+                "true if inject methods");
+        injMeths.setRequired(false);
+        options.addOption(injMeths);
 
         CommandLineParser parser = new DefaultParser();
         HelpFormatter formatter = new HelpFormatter();

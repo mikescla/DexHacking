@@ -1,15 +1,17 @@
 package Main;
 
 import org.apache.commons.cli.*;
+import org.apache.commons.io.IOUtils;
 import utils.LoggerMgmt;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.text.MessageFormat;
-import java.util.Scanner;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Stream;
 
@@ -39,7 +41,6 @@ public class ApkVerifier {
 
         Stream<Path> apkStream = Files.list(Paths.get(inputDir));
         // commands
-        String chdirCmd = MessageFormat.format("cd /d {0}", tempDir);
         String baseCmd;
         String currSystem = System.getProperty("os.name");
         if (currSystem.toLowerCase().contains("windows"))
@@ -55,27 +56,25 @@ public class ApkVerifier {
                 ProcessBuilder pb = new ProcessBuilder("cmd", "/C",
                         currCommand);
                 pb.directory(new File(tempDir));
+
                 //                    pb.redirectOutput(ProcessBuilder
                 //                    .Redirect.INHERIT);
                 pb.redirectError(ProcessBuilder.Redirect.INHERIT);
-                Process p = pb.start();
-                int exitCode = p.waitFor();
-                p.destroy();
 
+                Process p = pb.start();
+
+                int exitCode = p.waitFor();
                 if (exitCode != 0) {
-                    Scanner scanner = new Scanner(p.getErrorStream());
-                    while (scanner.hasNext()) {
-                        logger.severe(scanner.nextLine());
-                    }
+                    logger.severe(IOUtils.toString(p.getErrorStream(),
+                            StandardCharsets.UTF_8));
                 } else {
                     logger.info(MessageFormat.format("{0} is OK",
                             apkPath.getFileName()));
                 }
-            } catch (IOException ex) {
-                ex.printStackTrace();
-                System.out.println("Error! File not Found");
-            } catch (InterruptedException e) {
-                e.printStackTrace();
+
+                p.destroy();
+            } catch (IOException | InterruptedException ex) {
+                logger.log(Level.SEVERE, ex.getMessage(), ex);
             }
 
         });

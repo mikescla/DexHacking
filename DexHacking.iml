@@ -13,5 +13,6 @@
     <orderEntry type="library" name="commons-cli:commons-cli:1.4" level="project" />
     <orderEntry type="library" name="commons-codec:commons-codec:1.14" level="project" />
     <orderEntry type="library" name="com.google.guava:guava:29.0-jre" level="project" />
+    <orderEntry type="library" name="commons-io:commons-io:2.7" level="project" />
   </component>
 </module>

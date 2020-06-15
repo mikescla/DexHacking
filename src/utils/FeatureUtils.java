@@ -63,9 +63,10 @@ public class FeatureUtils {
     public static String getReturnTypeFromFeature(String inputString) {
 
         String[] f_splitted = inputString.split("@");
-        String[] splitted = f_splitted[1].split("&");
+        String[] s_splitted = f_splitted[1].split("&");
+        String t_splitted = s_splitted[1].split("\\|")[0];
 
-        String rawRet = splitted[1].replace("[]", "");
+        String rawRet = t_splitted.replace("[]", "");
 
         String ret = getReturnTypeFromString(rawRet);
         if (ret == null) {
@@ -75,6 +76,13 @@ public class FeatureUtils {
         if (inputString.contains("[]")) ret = "[" + ret;
 
         return ret;
+    }
+
+    public static boolean checkIfStaticFromFeature(String inputString) {
+
+        String[] splitted = inputString.split("\\|");
+
+        return splitted.length > 1;
     }
 
     public static String removeReturnTypeFromFeature(String inputString) {
