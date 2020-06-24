@@ -1,8 +1,3 @@
-/*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
- */
 package FileMgmt;
 
 import org.jf.dexlib2.DexFileFactory;
@@ -18,13 +13,12 @@ import java.util.List;
 import java.util.Set;
 
 /**
- *
  * @author fabri
  */
+// TODO move methods in another class (DexManager?) and remove this class
 public class DexMgmt {
 
-    public static DexFile loadDexFile(String path, int apiLevel)
-    {
+    public static DexFile loadDexFile(String path, int apiLevel) {
         File dexInputFile = new File(path);
         if (!dexInputFile.exists()) {
             System.err.println("Can't find the file " + dexInputFile.getName());
@@ -34,7 +28,8 @@ public class DexMgmt {
             return DexFileFactory.loadDexFile(dexInputFile,
                     Opcodes.forApi(apiLevel));
         } catch (IOException ex) {
-            System.out.println("IOException thrown when trying to open a dex" + " file: " + ex);
+            System.out.println("IOException thrown when trying to open a dex "
+                    + "file: " + ex);
         }
         return null;
     }
@@ -45,16 +40,17 @@ public class DexMgmt {
         DexFileFactory.writeDexFile(path, new DexFile() {
             @Override
             public Set<? extends ClassDef> getClasses() {
-                return new AbstractSet<ClassDef>() {
+                return new AbstractSet<>() {
 
                     @Override
                     public Iterator<ClassDef> iterator() {
                         return classes.iterator();
                     }
 
-                @Override public int size() {
-                    return classes.size();
-                }
+                    @Override
+                    public int size() {
+                        return classes.size();
+                    }
                 };
             }
 

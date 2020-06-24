@@ -27,19 +27,26 @@ import static utils.FileUtils.parseTextFile;
 import static utils.Settings.*;
 
 /**
+ * Main entry point.
+ * For each sample in the adversarial feature list, it picks the real apks
+ * (locations must be inserted via command line argument) and makes the
+ * adversarial sample.
+ *
  * @author Michele Scalas
  */
 public class HackingSystem {
-
+    // todo LINE CONVENTION: HARD WRAP AT 80 CHARS. SET THE IDE AS EXPLAINED IN
+    // https://stackoverflow.com/questions/24376980/how-to-split-long-strings
+    // -in-intellij-idea-automatically
+    // TODO LIBRARIES: USE MAVEN TO ADD NEEDED LIBRARIES. FOR DEXLIB, USE
+    //  MULTIDEXLIB2
     public static void main(String[] args) throws IOException {
         /*LOGGING*/
         Logger logger = LoggerMgmt.getLogger();
 
         /*ARGUMENT PARSING*/
+        // see function for details about args. Specifying -inputd is enough
         CommandLine cmd = parseArgs(args);
-
-        String parentDir =
-                Paths.get(System.getProperty("user.dir")).getParent().toString();
 
         String inputApkDir = cmd.getOptionValue("inputd");
         String featureMix = cmd.getOptionValue("fm", API_ID);
@@ -48,9 +55,11 @@ public class HackingSystem {
         String refApiLevel = cmd.getOptionValue("apil",
                 Integer.toString(DEF_API_LEVEL));
         boolean injectMethods = Boolean.parseBoolean(cmd.getOptionValue(
-                "injmeths", "true"));
+                "injmeths", "false"));
 
         /*ADVERSARIAL FEATURES LOADING*/
+        String parentDir =
+                Paths.get(System.getProperty("user.dir")).getParent().toString();
 
         // load differential feature vector
         Map<String, Map<Integer, Integer>> advVectors =
@@ -63,9 +72,13 @@ public class HackingSystem {
                         refApiLevel)).toString());
 
         /*APK FILES LISTING*/
+        // this can be slow,
+        // todo check if it is feasible to do a sort of cache or read a text
+        //  file with all the paths
         Map<String, String> availableApks = findFiles(inputApkDir);
 
         /*INJECTION*/
+        // todo add some timing log
         advVectors.entrySet().parallelStream().forEach(apkEntry -> {
             // check file presence
             String advHash = apkEntry.getKey();
@@ -80,12 +93,17 @@ public class HackingSystem {
 
             // decode apk
             int decCode = apkMng.decodeApk();
+            // TODO: check what's the best way in Java to check successful
+            //  result of a function
             if (decCode != 0) {
                 logger.warning("Could not decode APK. Skipped");
                 return;
             }
 
-            // get api level
+            // get api level of the apk, so that the injected code is
+            // selected according to the max supported api level
+            // todo switch to aapt or apkanalyzer to find targetsdkversion.
+            //  we need the same thing for the adversarial part
             DexFile dFile;
             try {
                 dFile = MultiDexIO.readDexFile(true,
@@ -123,7 +141,7 @@ public class HackingSystem {
             }
 
             if (dexMng == null) {
-                logger.info("Not an apk file. Skipped.");
+                logger.warning("Could not find dex file. Skipped.");
                 return;
             }
 
@@ -143,7 +161,7 @@ public class HackingSystem {
 
     }
 
-
+    // todo use constant values for args' names
     private static CommandLine parseArgs(String[] args) {
         Options options = new Options();
 
@@ -152,11 +170,7 @@ public class HackingSystem {
         apkFile.setRequired(true);
         options.addOption(apkFile);
 
-        Option resourceDir = new Option("res", "resDir", true, "resource " +
-                "directory path");
-        resourceDir.setRequired(false);
-        options.addOption(resourceDir);
-
+        // see settings for supported values
         Option featureMix = new Option("fm", "featureMix", true, "Feature mix");
         featureMix.setRequired(false);
         options.addOption(featureMix);
@@ -170,12 +184,14 @@ public class HackingSystem {
         apiDetail.setRequired(false);
         options.addOption(apiDetail);
 
-        Option apiLevel = new Option("apil", "apiLevel", true, "Api level");
+        Option apiLevel = new Option("apil", "apiLevel", true, "Api level of "
+                + "the classifier under attack");
         apiLevel.setRequired(false);
         options.addOption(apiLevel);
 
         Option injMeths = new Option("injmeths", "injectmethods", false,
-                "true if inject methods");
+                "whether or not inject methods, constructors" + " only " +
+                        "otherwise");
         injMeths.setRequired(false);
         options.addOption(injMeths);
 
@@ -187,7 +203,6 @@ public class HackingSystem {
             cmd = parser.parse(options, args);
         } catch (ParseException e) {
             System.out.println(e.getMessage());
-            formatter.printHelp("-apk APK_FILE_NAME", options);
 
             System.exit(1);
         }

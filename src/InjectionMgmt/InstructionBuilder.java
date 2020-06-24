@@ -1,28 +1,20 @@
-/*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
- */
 package InjectionMgmt;
 
 import com.google.common.collect.Lists;
 import org.jf.dexlib2.Opcode;
 import org.jf.dexlib2.builder.instruction.*;
-import org.jf.dexlib2.iface.DexFile;
 import org.jf.dexlib2.immutable.reference.ImmutableFieldReference;
 import org.jf.dexlib2.immutable.reference.ImmutableMethodReference;
 import org.jf.dexlib2.immutable.reference.ImmutableStringReference;
 import org.jf.dexlib2.immutable.reference.ImmutableTypeReference;
 
 /**
+ * Convenience class of static methods to get the typical instruction builders
+ *
  * @author fabri
+ * @author Michele Scalas
  */
 public class InstructionBuilder {
-    private DexFile dexFile;
-
-    //Constructor
-    public InstructionBuilder(DexFile dexFile) {
-    }
 
     public static BuilderInstruction10x NO_OP() {
         return new BuilderInstruction10x(Opcode.NOP);
@@ -105,7 +97,10 @@ public class InstructionBuilder {
                                                        String name,
                                                        Iterable parameters,
                                                        String returnType) {
-        return new BuilderInstruction35c(Opcode.INVOKE_VIRTUAL, registerCount, registerC, registerD, registerE, registerF, registerG, new ImmutableMethodReference(definingClass, name, parameters, returnType));
+        return new BuilderInstruction35c(Opcode.INVOKE_VIRTUAL, registerCount
+                , registerC, registerD, registerE, registerF, registerG,
+                new ImmutableMethodReference(definingClass, name, parameters,
+                        returnType));
     }
 
     public static BuilderInstruction21c CONST_4(int registerA, int value) {

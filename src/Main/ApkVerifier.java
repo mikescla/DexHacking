@@ -18,6 +18,13 @@ import java.util.stream.Stream;
 import static utils.Settings.DEX2JAR_PATH;
 import static utils.Settings.TEMP_DIR;
 
+/**
+ * Basic apk verifier leveraging Dex2Jar.
+ * If the output is an error, there problems in the apk for sure. If there
+ * are warnings or no errors, we don't know; execution is needed.
+ *
+ * @author Michele Scalas
+ */
 public class ApkVerifier {
 
     private static final Path baseDir =
@@ -31,16 +38,20 @@ public class ApkVerifier {
             Paths.get(parentDir, TEMP_DIR).toString();
 
     public static void main(String[] args) throws IOException {
-        // logging
+        /*LOGGING*/
         Logger logger = LoggerMgmt.getLogger();
 
-        // argument parsing
+        /*ARGUMENT PARSING*/
         CommandLine cmd = parseArgs(args);
 
         String inputDir = cmd.getOptionValue("inputd");
 
+        /*VERIFICATION*/
+
+        // list of apk files
         Stream<Path> apkStream = Files.list(Paths.get(inputDir));
-        // commands
+
+        // base command
         String baseCmd;
         String currSystem = System.getProperty("os.name");
         if (currSystem.toLowerCase().contains("windows"))
@@ -55,10 +66,8 @@ public class ApkVerifier {
                 // TODO refactor to support linux
                 ProcessBuilder pb = new ProcessBuilder("cmd", "/C",
                         currCommand);
-                pb.directory(new File(tempDir));
 
-                //                    pb.redirectOutput(ProcessBuilder
-                //                    .Redirect.INHERIT);
+                pb.directory(new File(tempDir)); //<- jar output in temp folder
                 pb.redirectError(ProcessBuilder.Redirect.INHERIT);
 
                 Process p = pb.start();
@@ -84,8 +93,8 @@ public class ApkVerifier {
     private static CommandLine parseArgs(String[] args) {
         Options options = new Options();
 
-        Option apkFile = new Option("inputd", "inputDir", true, "input APKs' "
-                + "dir");
+        Option apkFile = new Option("inputd", "inputDir", true,
+                "input APKs' " + "dir");
         apkFile.setRequired(true);
         options.addOption(apkFile);
 

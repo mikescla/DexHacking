@@ -12,6 +12,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+/**
+ * Convenience class with file management utilities
+ *
+ * @author Michele Scalas
+ */
 public class FileUtils {
     public static String getSHA256Hash(String input) {
         FileInputStream fis = null;
@@ -29,7 +34,7 @@ public class FileUtils {
 
     public static Map<String, String> findFiles(String inputDir) throws IOException {
         System.out.println("Collecting file list...");
-        return Files.walk(Paths.get(inputDir)).filter(Files::isRegularFile).map(Path::toString).collect(Collectors.toMap(FileUtils::getSHA256Hash, s -> s));
+        return Files.walk(Paths.get(inputDir)).filter(Files::isRegularFile).map(Path::toString).collect(Collectors.toMap(FileUtils::getSHA256Hash, s -> s, (s1, s2) -> s1));
 
     }
 

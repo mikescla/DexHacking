@@ -1,8 +1,3 @@
-/*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
- */
 package utils;
 
 import java.io.File;
@@ -14,9 +9,13 @@ import java.util.Date;
 import java.util.logging.*;
 
 /**
+ * Logger
+ *
  * @author fabri
+ * @author Michele Scalas
  */
-public class LoggerMgmt { //TODO: switch to slf4j
+public class LoggerMgmt { //TODO: switch to slf4j and/or improve printing
+    // todo use logger in classes, manage logger levels (debug, info, etc.)
 
     public static Logger getLogger() throws IOException {
         String callerName =
@@ -47,8 +46,8 @@ public class LoggerMgmt { //TODO: switch to slf4j
         logger.addHandler(fh);
         logger.addHandler(ch);
 
-        System.setProperty("java.util.logging.SimpleFormatter.format", "%5$s:" +
-                " " + "%6$s %n");
+        System.setProperty("java.util.logging.SimpleFormatter.format",
+                "%5$s" + ":" + " " + "%6$s %n");
         logger.setUseParentHandlers(false);
 
         return logger;

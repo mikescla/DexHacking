@@ -1,5 +1,10 @@
 package InjectionMgmt;
 
+/**
+ * Convenience class containing information about where and what calls to inject
+ *
+ * @author Michele Scalas
+ */
 public class InjectionData {
     private final int classIndex;
     private final int methodIndex;

@@ -1,15 +1,14 @@
-/*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
- */
 package DexEditing;
 
 import java.util.HashMap;
 import java.util.Map;
 
 /**
+ * Convenience class to store the mapping between primitive Java types and
+ * the associated smali identifier
+ *
  * @author fabri
+ * @author Michele Scalas
  */
 public class ReturnType {
     static final Map<String, String> primitiveMapping = new HashMap<>() {{

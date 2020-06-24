@@ -1,8 +1,3 @@
-/*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
- */
 package FileMgmt;
 
 import com.google.common.io.Files;
@@ -20,7 +15,10 @@ import java.util.logging.Logger;
 import static utils.Settings.*;
 
 /**
+ * Apk Manager
+ *
  * @author fabri
+ * @author Michele Scalas
  */
 public class ApkManager {
     private final String baseDir =
@@ -31,9 +29,6 @@ public class ApkManager {
     private final String apkToolPath =
             Paths.get(baseDir, APKTOOL_FILEPATH).toString();
 
-    private final String decodingDir =
-            Paths.get(Paths.get(baseDir).getParent().toString(), TEMP_DIR).toString();
-
 
     private final Logger logger;
 
@@ -41,39 +36,26 @@ public class ApkManager {
     private final String apkPath;
     private final String decodedApkDir;
 
-    public ApkManager(Path apkPath, Logger logger) {
 
+    public ApkManager(Path apkPath, Logger logger) {
+        // TODO check if it is better to add apk hash to use it for output file
+        //  names
         this.logger = logger;
 
         this.apkName = apkPath.getFileName().toString();
         this.apkPath = apkPath.toString();
 
-        this.decodedApkDir = Paths.get(this.decodingDir,
-                this.getBaseApkName()).toString();
+        String decodingDir =
+                Paths.get(Paths.get(baseDir).getParent().toString(),
+                        TEMP_DIR).toString();
+        this.decodedApkDir =
+                Paths.get(decodingDir, this.getBaseApkName()).toString();
 
-    }
-
-    public void signApk(String apkPath) {
-        try {
-            Process cmd =
-                    Runtime.getRuntime().exec("jarsigner -storepass " +
-                            "keykey -sigalg SHA1withRSA -digestalg SHA1 " +
-                            "-keystore \"" + this.signKeyPath + "\" \"" + apkPath + "\" Key");
-            int exitCode = cmd.waitFor();
-            if (exitCode != 0)
-                logger.severe(IOUtils.toString(cmd.getErrorStream(),
-                        StandardCharsets.UTF_8));
-
-            cmd.destroy();
-        } catch (IOException ex) {
-            logger.severe("Error! File not Found");
-        } catch (InterruptedException ex) {
-            logger.severe("Error! Execution interrupted!");
-        }
     }
 
     public int decodeApk() {
         try {
+            // todo use MessageFormat.format()
             Process cmd =
                     Runtime.getRuntime().exec("java -jar \"" + this.apkToolPath + "\" d -r -s -f -o \"" + this.decodedApkDir + "\" \"" + this.apkPath + "\"");
 
@@ -95,7 +77,9 @@ public class ApkManager {
     public void buildApk(String apkPath, int apkApiLevel, String outputPath) {
         try {
             Process cmd = Runtime.getRuntime().exec(MessageFormat.format(
-                    "java -jar \"{0}\" b --force-all --debug -api {3}" + " " + "-o" + " " + "\"{1}\" \"{2}\" ", this.apkToolPath, outputPath, apkPath, apkApiLevel));
+                    "java -jar \"{0}\" b --force-all --debug -api {3} -o " +
+                            "\"{1}\" \"{2}\"", this.apkToolPath, outputPath,
+                    apkPath, apkApiLevel));
 
             int exitCode = cmd.waitFor();
             if (exitCode != 0)
@@ -112,9 +96,30 @@ public class ApkManager {
         }
     }
 
-    // GETTERS
+    public void signApk(String apkPath) {
+        try {
+            // todo use MessageFormat.format()
+            Process cmd =
+                    Runtime.getRuntime().exec("jarsigner -storepass " +
+                            "keykey -sigalg SHA1withRSA -digestalg SHA1 " +
+                            "-keystore \"" + this.signKeyPath + "\" \"" + apkPath + "\" Key");
+            int exitCode = cmd.waitFor();
+            if (exitCode != 0)
+                logger.severe(IOUtils.toString(cmd.getErrorStream(),
+                        StandardCharsets.UTF_8));
+
+            cmd.destroy();
+        } catch (IOException ex) {
+            logger.severe("Error! File not Found");
+        } catch (InterruptedException ex) {
+            logger.severe("Error! Execution interrupted!");
+        }
+    }
+
+    /*GETTERS*/
 
     public String getBaseApkName() {
+        //noinspection UnstableApiUsage
         return Files.getNameWithoutExtension(this.apkPath);
     }
 
